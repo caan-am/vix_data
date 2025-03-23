@@ -9,19 +9,19 @@ from itertools import chain
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-def SpikeDate(date,data,threshold,window1,window2):
+def SpikeDate(date, data, threshold, window1):
+    # Crear una condición inicial en falso
+    test1 = False
     
-    vix_change = data.pct_change(periods=window1-1)
-    # relative changes that are larger than the threshold
-    test1 = vix_change > threshold  
-    # the spike date must be the one that has the largest value during the past few days
-    test2 = (data.rolling(window1).max() == data) 
-    pot_spk = date[test1&test2]  # all potential spike dates 
+    # Verificar si el cambio en cualquier ventana desde (window1-1) hasta 1 supera el umbral
+    for i in range(1, window1):  
+        test1 |= data.pct_change(periods=i) > threshold  
     
-    # commented because I don´t want that filter
-    # date_change = (pot_spk.shift(-1) - pot_spk).dt.days # the days between this spike and next spike
-    # test3 = date_change >= window2  # whether the days between two potential spikes are larger than window2
-    # spike_date = pot_spk[test3]
+    # El valor debe ser el máximo dentro de los últimos window1 días
+    test2 = (data.rolling(window1).max() == data)
+    
+    # Fechas que cumplen ambas condiciones
+    pot_spk = date[test1 & test2]
     
     return pot_spk
 
@@ -162,10 +162,9 @@ for days in [5, 10, 21]:
     combined[f'Max VIX in {days}D'] = combined['VIX'].rolling(window=days).max().shift(-days + 1)
 
 #Añadir dia de Spikes
-threshold = 0.2
+threshold = 0.15
 window1 = 5
-window2 = 5
-spk_date = SpikeDate(combined["Trade Date"],combined.VIX,threshold,window1,window2)
+spk_date = SpikeDate(combined["Trade Date"],combined.VIX,threshold,window1)
 combined["Spike"] = combined["Trade Date"].isin(spk_date).map({True: "Yes", False: "No"})
 
 #Añadir spikes en 5 Días
